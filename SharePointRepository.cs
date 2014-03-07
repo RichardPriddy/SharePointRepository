@@ -143,7 +143,7 @@ namespace Amt.SharePoint.Integration
             return obj;
         }
 
-        public IEnumerable<T> GetByQuery(string query = "<Query></Query>")
+        public IEnumerable<T> GetByQuery(string query = "<View><Query></Query></View>")
         {
             var web = _ctx.Web;
             var list = web.Lists.GetByTitle(TSharePointListName);
