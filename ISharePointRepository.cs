@@ -12,7 +12,7 @@ namespace Amt.SharePoint.Integration
 
         T GetById(int id);
 
-        IEnumerable<T> GetByQuery(string query);
+        IEnumerable<T> GetByQuery(string query = "<Query></Query>");
 
         // I don't know if I should include this in the interface.
         TType GetById<TType>(int id) where TType : SharePointDomainModel, new();
