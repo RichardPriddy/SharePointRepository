@@ -2,7 +2,7 @@
 
 namespace Amt.SharePoint.Integration
 {
-    public interface ISharePointRepository<T> where T : ISharePointDomainModel
+    public interface ISharePointRepository<T> where T : SharePointDomainModel
     {
         void Add(T aggregateRoot);
 
@@ -13,5 +13,8 @@ namespace Amt.SharePoint.Integration
         T GetById(int id);
 
         IEnumerable<T> GetByQuery(string query);
+
+        // I don't know if I should include this in the interface.
+        TType GetById<TType>(int id) where TType : SharePointDomainModel, new();
     }
 }
