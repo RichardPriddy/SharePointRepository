@@ -16,9 +16,13 @@ namespace Amt.SharePoint.Integration.ExtensionMethods
         {
             var attribute = propInfo.GetCustomAttribute<ColumnNameAttribute>();
 
-            return attribute == null
+            var name = attribute == null
                 ? propInfo.Name
                 : EncodeToInternalField(attribute.ColumnName);
+
+            return name.Length > 32
+                ? name.Substring(0, 32)
+                : name;
         }
 
         /// <summary>
