@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Security;
-using System.Text;
-using System.Web;
 using Amt.SharePoint.Integration.ExtensionMethods;
 using Amt.SharePoint.Integration.ModelAttributes;
 using Microsoft.SharePoint.Client;
@@ -22,7 +20,7 @@ namespace Amt.SharePoint.Integration
         {
             _sharepointUrl = sharepointUrl;
             _username = username;
-            
+
             var secureStr = new SecureString();
 
             foreach (var c in password.ToCharArray())
@@ -117,7 +115,7 @@ namespace Amt.SharePoint.Integration
 
             return obj;
         }
-        
+
         public T GetById(int id)
         {
             var web = _ctx.Web;
@@ -168,7 +166,7 @@ namespace Amt.SharePoint.Integration
                     {
                         SetPropertyValue(propInfo, obj, item);
                     }
-                    catch(Exception ex) { }
+                    catch { }
                 }
 
                 returnList.Add(obj);
@@ -188,23 +186,51 @@ namespace Amt.SharePoint.Integration
 
             if (attribute == null)
             {
-                propInfo.SetValue(obj,
-                    Convert.ChangeType(item[propInfo.PropertyName()], propInfo.PropertyType), null);
+                var underlyingType = Nullable.GetUnderlyingType(propInfo.PropertyType) ?? propInfo.PropertyType;
+
+                propInfo.SetValue(obj, Convert.ChangeType(item[propInfo.PropertyName()], underlyingType), null);
             }
             else
             {
                 if (item[propInfo.PropertyName()] == null) return;
 
-                var id = ((FieldLookupValue)(item[propInfo.PropertyName()])).LookupId;
+                if (propInfo.PropertyType.IsArray)
+                {
+                    Type arrayType = propInfo.PropertyType.GetElementType();
 
-                GenericInvoker invoker = DynamicMethods.
-                    GenericMethodInvokerMethod(typeof(SharePointRepository<T>),
-                        "GetById", new[] { propInfo.PropertyType },
-                        new[] { propInfo.PropertyType });
+                    var array = Array.CreateInstance(arrayType, ((FieldLookupValue[])(item[propInfo.PropertyName()])).Count());
+                    
+                    for (var index = 0; 
+                             index < ((FieldLookupValue[]) (item[propInfo.PropertyName()])).Length; 
+                             index++)
+                    {
+                        var lookupId = ((FieldLookupValue[]) (item[propInfo.PropertyName()]))[index].LookupId;
 
-                var lookupItem = invoker(this, id);
+                        GenericInvoker invoker = DynamicMethods.
+                            GenericMethodInvokerMethod(typeof (SharePointRepository<T>),
+                                "GetById", new[] { arrayType },
+                                new[] { arrayType });
 
-                propInfo.SetValue(obj, Convert.ChangeType(lookupItem, propInfo.PropertyType), null);
+                        var lookupItem = invoker(this, lookupId);
+                        
+                        array.SetValue(lookupItem, index);
+                    }
+
+                    propInfo.SetValue(obj, array, null);
+                }
+                else
+                {
+                    var lookupId = ((FieldLookupValue) (item[propInfo.PropertyName()])).LookupId;
+
+                    GenericInvoker invoker = DynamicMethods.
+                        GenericMethodInvokerMethod(typeof (SharePointRepository<T>),
+                            "GetById", new[] {propInfo.PropertyType},
+                            new[] {propInfo.PropertyType});
+
+                    var lookupItem = invoker(this, lookupId);
+
+                    propInfo.SetValue(obj, Convert.ChangeType(lookupItem, propInfo.PropertyType), null);
+                }
             }
         }
 
@@ -216,23 +242,42 @@ namespace Amt.SharePoint.Integration
                 try
                 {
                     if (propInfo.Name == "ID") continue;
-                    
+
                     var attribute = propInfo.GetCustomAttribute<LookupListNameAttribute>();
 
-                    if (attribute == null)
+                    if (propInfo.PropertyType.IsArray)
                     {
-                        listItem[propInfo.PropertyName()] = propInfo.GetValue(aggregateRoot);
+                        if (attribute == null)
+                        {
+                            listItem[propInfo.PropertyName()] = propInfo.GetValue(aggregateRoot);
+                        }
+                        else
+                        {
+                            var values = propInfo.GetValue(aggregateRoot) as SharePointDomainModel[];
+
+                            listItem[propInfo.PropertyName()] = values.Select(value => new FieldLookupValue
+                            {
+                                LookupId = value.ID
+                            }).ToArray();
+                        }
                     }
                     else
                     {
-                        var value = propInfo.GetValue(aggregateRoot) as SharePointDomainModel;
-
-                        var lookupValue = new FieldLookupValue
+                        if (attribute == null)
                         {
-                            LookupId = value.ID
-                        };
+                            listItem[propInfo.PropertyName()] = propInfo.GetValue(aggregateRoot);
+                        }
+                        else
+                        {
+                            var value = propInfo.GetValue(aggregateRoot) as SharePointDomainModel;
 
-                        listItem[propInfo.PropertyName()] = lookupValue;
+                            var lookupValue = new FieldLookupValue
+                            {
+                                LookupId = value.ID
+                            };
+
+                            listItem[propInfo.PropertyName()] = lookupValue;
+                        }
                     }
                 }
                 catch { }
@@ -244,10 +289,10 @@ namespace Amt.SharePoint.Integration
             get
             {
                 var attribute =
-                    Attribute.GetCustomAttribute(typeof (T), typeof (ListNameAttribute)) as ListNameAttribute;
+                    Attribute.GetCustomAttribute(typeof(T), typeof(ListNameAttribute)) as ListNameAttribute;
 
                 return attribute == null
-                    ? typeof (T).Name
+                    ? typeof(T).Name
                     : attribute.ListName;
             }
         }
