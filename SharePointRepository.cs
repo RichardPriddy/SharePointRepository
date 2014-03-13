@@ -141,6 +141,11 @@ namespace Amt.SharePoint.Integration
             return obj;
         }
 
+        public IEnumerable<T> GetByIds(IEnumerable<int> ids)
+        {
+            return GetByQuery(ids.ToCamlQuery("Or"));
+        }
+
         public IEnumerable<T> GetByQuery(string query = "<View><Query></Query></View>")
         {
             var web = _ctx.Web;

@@ -83,6 +83,7 @@
     <Compile Include="Authentication\IWsTrustFeb2005Contract.cs" />
     <Compile Include="Authentication\MsOnlineClaimsHelper.cs" />
     <Compile Include="DynamicMethods.cs" />
+    <Compile Include="ExtensionMethods\ListOfIntExtensionMenthods.cs" />
     <Compile Include="ExtensionMethods\PropertyInfoExtensionMethods.cs" />
     <Compile Include="ISharePointRepository.cs" />
     <Compile Include="ModelAttributes\LookupListNameAttribute.cs" />

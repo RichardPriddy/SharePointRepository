@@ -12,6 +12,8 @@ namespace Amt.SharePoint.Integration
 
         T GetById(int id);
 
+        IEnumerable<T> GetByIds(IEnumerable<int> ids);
+
         IEnumerable<T> GetByQuery(string query = "<Query></Query>");
 
         // I don't know if I should include this in the interface.
