@@ -1,10 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 using System.Web;
 using Amt.SharePoint.Integration.ModelAttributes;
 
@@ -42,7 +39,11 @@ namespace Amt.SharePoint.Integration.ExtensionMethods
                 {
                     encodedChar = encodedChar.Replace("u", "x");
                     encodedChar = encodedChar.Substring(1, encodedChar.Length - 1);
-                    encodedChar = String.Format("_{0}_", encodedChar);
+                    while (encodedChar.Length < 4)
+                    {
+                        encodedChar = "0" + encodedChar;
+                    }
+                    encodedChar = String.Format("_x{0}_", encodedChar);
                     encodedString.Append(encodedChar);
                 }
                 else switch (encodedChar)
