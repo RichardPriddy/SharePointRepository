@@ -247,6 +247,9 @@ namespace Amt.SharePoint.Integration
                 try
                 {
                     if (propInfo.Name == "ID") continue;
+                    
+                    var lookupPropertyAttribute = propInfo.GetCustomAttribute<LookupPropertyValue>();
+                    if (lookupPropertyAttribute != null && lookupPropertyAttribute.IsLookupProperty) continue;
 
                     var attribute = propInfo.GetCustomAttribute<LookupListNameAttribute>();
 
