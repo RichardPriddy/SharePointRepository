@@ -3,11 +3,11 @@
 namespace Amt.SharePoint.Integration.ModelAttributes
 {
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
-    public class LookupPropertyValue : Attribute
+    public class LookupPropertyValueAttribute : Attribute
     {
         public bool IsLookupProperty { get; set; }
 
-        public LookupPropertyValue(bool isLookupProperty)
+        public LookupPropertyValueAttribute(bool isLookupProperty)
         {
             IsLookupProperty = isLookupProperty;
         }

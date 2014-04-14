@@ -86,8 +86,9 @@
     <Compile Include="ExtensionMethods\ListOfIntExtensionMenthods.cs" />
     <Compile Include="ExtensionMethods\PropertyInfoExtensionMethods.cs" />
     <Compile Include="ISharePointRepository.cs" />
+    <Compile Include="ModelAttributes\GeneratedPropertyAttribute.cs" />
     <Compile Include="ModelAttributes\LookupListNameAttribute.cs" />
-    <Compile Include="ModelAttributes\LookupPropertyValue.cs" />
+    <Compile Include="ModelAttributes\LookupPropertyValueAttribute.cs" />
     <Compile Include="SharePointDomainModel.cs" />
     <Compile Include="ModelAttributes\ColumnNameAttribute.cs" />
     <Compile Include="ModelAttributes\ListNameAttribute.cs" />

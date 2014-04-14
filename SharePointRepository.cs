@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Security;
+using System.Text;
 using Amt.SharePoint.Integration.ExtensionMethods;
 using Amt.SharePoint.Integration.ModelAttributes;
 using Microsoft.SharePoint.Client;
@@ -97,7 +98,7 @@ namespace Amt.SharePoint.Integration
             var list = web.Lists.GetByTitle(name);
 
             ListItem listItem = list.GetItemById(id);
-
+            
             _ctx.Load(listItem);
             _ctx.ExecuteQuery();
 
@@ -151,12 +152,14 @@ namespace Amt.SharePoint.Integration
             var web = _ctx.Web;
             var list = web.Lists.GetByTitle(TSharePointListName);
 
+            query = AppendViewFields(query);
+
             var camlQuery = new CamlQuery { ViewXml = query };
 
             ListItemCollection listItems = list.GetItems(camlQuery);
-
             _ctx.Load(listItems);
             _ctx.ExecuteQuery();
+
 
             var returnList = new List<T>();
 
@@ -183,6 +186,24 @@ namespace Amt.SharePoint.Integration
         public void Disconnect()
         {
             _ctx.Dispose();
+        }
+
+        private string AppendViewFields(string query)
+        {
+            if (query.Contains("ViewFields"))
+            {
+                return query;
+            }
+
+            var viewFieldsBuilder = new StringBuilder("<ViewFields>");
+            foreach (var propInfo in typeof(T).GetProperties())
+            {
+                viewFieldsBuilder.Append(string.Format("<FieldRef Name='{0}' />", propInfo.PropertyName()));
+            }
+            viewFieldsBuilder.Append("</ViewFields>");
+            viewFieldsBuilder.Append("</View>");
+
+            return query.Replace("</View>", viewFieldsBuilder.ToString());
         }
 
         private void SetPropertyValue<TType>(PropertyInfo propInfo, TType obj, ListItem item) where TType : SharePointDomainModel
@@ -247,9 +268,13 @@ namespace Amt.SharePoint.Integration
                 try
                 {
                     if (propInfo.Name == "ID") continue;
-                    
-                    var lookupPropertyAttribute = propInfo.GetCustomAttribute<LookupPropertyValue>();
+
+                    // Can't map lookup property values
+                    var lookupPropertyAttribute = propInfo.GetCustomAttribute<LookupPropertyValueAttribute>();
                     if (lookupPropertyAttribute != null && lookupPropertyAttribute.IsLookupProperty) continue;
+                    // Can't map generated properties
+                    var generatedPropertyAttribute = propInfo.GetCustomAttribute<GeneratedPropertyAttribute>();
+                    if (generatedPropertyAttribute != null && generatedPropertyAttribute.IsPropertyGenerated) continue;
 
                     var attribute = propInfo.GetCustomAttribute<LookupListNameAttribute>();
 
