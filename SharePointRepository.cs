@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security;
@@ -7,6 +8,7 @@ using System.Text;
 using Amt.SharePoint.Integration.ExtensionMethods;
 using Amt.SharePoint.Integration.ModelAttributes;
 using Microsoft.SharePoint.Client;
+using File = Microsoft.SharePoint.Client.File;
 
 namespace Amt.SharePoint.Integration
 {
@@ -84,6 +86,25 @@ namespace Amt.SharePoint.Integration
             _ctx.ExecuteQuery();
         }
 
+        public void DownloadFile<TType>(TType aggregateRoot, Stream download) where TType : SharePointDocumentDomainModel
+        {
+            var fileInfo = File.OpenBinaryDirect(_ctx, aggregateRoot.FileRef);
+
+            using (var memory = new MemoryStream())
+            {
+                var buffer = new byte[1024 * 64];
+                int nread;
+
+                while ((nread = fileInfo.Stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    memory.Write(buffer, 0, nread);
+                }
+
+                memory.Seek(0, SeekOrigin.Begin);
+                memory.CopyTo(download);
+            }
+        }
+
         public TType GetById<TType>(int id) where TType : SharePointDomainModel, new()
         {
             var web = _ctx.Web;
@@ -159,7 +180,6 @@ namespace Amt.SharePoint.Integration
             ListItemCollection listItems = list.GetItems(camlQuery);
             _ctx.Load(listItems);
             _ctx.ExecuteQuery();
-
 
             var returnList = new List<T>();
 

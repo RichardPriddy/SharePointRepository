@@ -89,6 +89,7 @@
     <Compile Include="ModelAttributes\GeneratedPropertyAttribute.cs" />
     <Compile Include="ModelAttributes\LookupListNameAttribute.cs" />
     <Compile Include="ModelAttributes\LookupPropertyValueAttribute.cs" />
+    <Compile Include="SharePointDocumentDomainModel.cs" />
     <Compile Include="SharePointDomainModel.cs" />
     <Compile Include="ModelAttributes\ColumnNameAttribute.cs" />
     <Compile Include="ModelAttributes\ListNameAttribute.cs" />
