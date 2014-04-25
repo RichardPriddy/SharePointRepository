@@ -98,6 +98,17 @@
     <Compile Include="Authentication\WsTrustFeb2005ContractClient.cs" />
     <Compile Include="SharePointRepository.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="README.html">
+      <DependentUpon>README.md</DependentUpon>
+    </Content>
+    <Content Include="README.min.html">
+      <DependentUpon>README.html</DependentUpon>
+    </Content>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

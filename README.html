@@ -1,0 +1,15 @@
+<h1>README</h1>
+
+<p><strong>SharePoint.Integration</strong> is a project designed to apply a repository pattern to storing data in SharePoint.</p>
+
+<p>In an MVC application, this can be registered for dependancy injection in the following way:</p>
+
+<pre><code>For(typeof (ISharePointRepository&lt;&gt;)).Use(typeof (SharePointRepository&lt;&gt;))
+    .CtorDependency&lt;string&gt;("sharepointUrl").Is("&lt;&lt;SHAREPOINT_URL&gt;&gt;")
+    .CtorDependency&lt;string&gt;("username").Is("&lt;&lt;USERNAME&gt;&gt;")
+    .CtorDependency&lt;string&gt;("password").Is("&lt;&lt;PASSWORD&gt;&gt;");
+</code></pre>
+
+<p>License: MIT <a href="http://www.opensource.org/licenses/mit-license.php">http://www.opensource.org/licenses/mit-license.php</a></p>
+
+<p>Instructions: <a href="http://richerprogramming.richardpriddy.co.uk/search/label/SharePointRepository">http://richerprogramming.richardpriddy.co.uk/search/label/SharePointRepository</a></p>

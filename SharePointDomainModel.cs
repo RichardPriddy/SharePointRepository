@@ -1,3 +1,5 @@
+using System;
+
 namespace Amt.SharePoint.Integration
 {
     public class SharePointDomainModel
