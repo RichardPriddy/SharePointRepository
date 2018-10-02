@@ -12,25 +12,6 @@ namespace Amt.SharePoint.Integration
 
     public static class DynamicMethods
     {
-        #region Constants
-        #endregion // Constants
-
-        #region Fields
-        #endregion // Fields
-
-        #region Constructors
-        #endregion // Constructors
-
-        #region Properties
-        #endregion // Properties
-
-        #region Operators
-        #endregion // Operators
-
-        #region Events
-        #endregion // Events
-
-        #region Methods
         private static void FindMethod(Type type, string methodName, Type[] typeArguments, Type[] parameterTypes, out MethodInfo methodInfo,
             out ParameterInfo[] parameters)
         {
@@ -159,6 +140,5 @@ namespace Amt.SharePoint.Integration
         {
             return GenericMethodInvokerMethod(type, methodName, typeArguments, null);
         }
-        #endregion // Methods
     }
 }

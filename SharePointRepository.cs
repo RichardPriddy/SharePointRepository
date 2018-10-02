@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Reflection;
 using System.Security;
 using System.Text;
+using System.Text.RegularExpressions;
+using System.Web;
 using Amt.SharePoint.Integration.ExtensionMethods;
 using Amt.SharePoint.Integration.ModelAttributes;
+using Amt.SharePoint.Integration.Models;
 using Microsoft.SharePoint.Client;
 using File = Microsoft.SharePoint.Client.File;
 
@@ -38,7 +43,9 @@ namespace Amt.SharePoint.Integration
 
         private void Connect()
         {
-            _ctx = new ClientContext(_sharepointUrl)
+            var url = _sharepointUrl;
+
+            _ctx = new ClientContext(url + TSharePointSubSiteName)
                       {
                           AuthenticationMode = ClientAuthenticationMode.Default,
                           Credentials = new SharePointOnlineCredentials(_username, _password)
@@ -58,6 +65,8 @@ namespace Amt.SharePoint.Integration
             listItem.Update();
 
             _ctx.ExecuteQuery();
+
+            aggregateRoot.ID = listItem.Id;
         }
 
         public void Update(T aggregateRoot)
@@ -208,6 +217,12 @@ namespace Amt.SharePoint.Integration
             _ctx.Dispose();
         }
 
+        /// <summary>
+        /// Takes a CAML query and appends all properties of associated type into the ViewFields section of the CAML query.
+        /// We ignore anything marked with the Display Property Attribute.
+        /// </summary>
+        /// <param name="query">The CAML query.</param>
+        /// <returns>The CAML query with ViewFields appended.</returns>
         private string AppendViewFields(string query)
         {
             if (query.Contains("ViewFields"))
@@ -218,6 +233,13 @@ namespace Amt.SharePoint.Integration
             var viewFieldsBuilder = new StringBuilder("<ViewFields>");
             foreach (var propInfo in typeof(T).GetProperties())
             {
+                // Ignore anything that's marked as a dislpay property.
+                var displayPropertyAttribute = propInfo.GetCustomAttribute<DisplayPropertyAttribute>();
+                if (displayPropertyAttribute != null) continue;
+                // Don't map ignored properties
+                var ignoredPropertyAttribute = propInfo.GetCustomAttribute<IgnoredPropertyAttribute>();
+                if (ignoredPropertyAttribute != null) continue;
+
                 viewFieldsBuilder.Append(string.Format("<FieldRef Name='{0}' />", propInfo.PropertyName()));
             }
             viewFieldsBuilder.Append("</ViewFields>");
@@ -228,13 +250,91 @@ namespace Amt.SharePoint.Integration
 
         private void SetPropertyValue<TType>(PropertyInfo propInfo, TType obj, ListItem item) where TType : SharePointDomainModel
         {
+            // Don't map ignored properties
+            var ignoredPropertyAttribute = propInfo.GetCustomAttribute<IgnoredPropertyAttribute>();
+            if (ignoredPropertyAttribute != null) return;
+
             var attribute = propInfo.GetCustomAttribute<LookupListNameAttribute>();
 
             if (attribute == null)
             {
                 var underlyingType = Nullable.GetUnderlyingType(propInfo.PropertyType) ?? propInfo.PropertyType;
 
+                if (underlyingType.FullName == "Amt.SharePoint.Integration.Models.User")
+                {
+                    var fieldUserValue = (FieldUserValue)item[propInfo.PropertyName()];
+                    var user = _ctx.Web.SiteUsers.GetById(fieldUserValue.LookupId);
+                    _ctx.Load(user);
+                    _ctx.ExecuteQuery();
+
+                    var sharePointUser = new Models.User
+                    {
+                        Email = user.Email,
+                        ID = user.Id,
+                        LoginName = user.LoginName,
+                        Title = user.Title
+                    };
+
+                    propInfo.SetValue(obj, sharePointUser, null);
+                }
+                if (underlyingType.FullName == "Amt.SharePoint.Integration.Models.Hyperlink")
+                {
+                    var fieldUrlValue = (FieldUrlValue)item[propInfo.PropertyName()];
+
+                    if (fieldUrlValue == null)
+                    {
+                        propInfo.SetValue(obj, null, null);
+                        return;
+                    }
+
+                    //TODO: Downlaod content if downloadable.
+                    var url = fieldUrlValue.Url;
+
+                    var downloadableContent = propInfo.GetCustomAttribute<DownloadableContentAttribute>();
+                    if (downloadableContent != null)
+                    {
+                        var rootUrl = string.Join("/", _sharepointUrl.Split('/').Take(3).ToArray());
+                        url = url.Replace(rootUrl + "/:i:/r", "");
+                        url = url.Replace(rootUrl, "");
+                        url = url.Split('?')[0];
+                        DownloadImage(url);
+                    }
+
+                    var hyperlink = new Hyperlink
+                    {
+                        Url = url,
+                        Description = fieldUrlValue.Description,
+                        TypeId = fieldUrlValue.TypeId
+                    };
+
+                    propInfo.SetValue(obj, hyperlink, null);
+                }
+                if (underlyingType.FullName == "Amt.SharePoint.Integration.Models.PublishingImage")
+                {
+                    var fieldUrlValue = (string)item[propInfo.PropertyName()];
+
+                    if (fieldUrlValue == null)
+                    {
+                        propInfo.SetValue(obj, null, null);
+                        return;
+                    }
+
+                    Match matches = Regex.Match(fieldUrlValue, "alt=\"(?<AltTag>.*?)\".* src=\"(?<SrcTag>.*?)\"");
+
+                    DownloadImage(matches.Groups["SrcTag"].Value);
+
+                    var image = new PublishingImage
+                    {
+                        Alt = matches.Groups["AltTag"].Value,
+                        Src = matches.Groups["SrcTag"].Value
+                    };
+
+                    propInfo.SetValue(obj, image, null);
+                }
+                else
+                {
                 propInfo.SetValue(obj, Convert.ChangeType(item[propInfo.PropertyName()], underlyingType), null);
+            }
             }
             else
             {
@@ -295,16 +395,15 @@ namespace Amt.SharePoint.Integration
                     // Can't map generated properties
                     var generatedPropertyAttribute = propInfo.GetCustomAttribute<GeneratedPropertyAttribute>();
                     if (generatedPropertyAttribute != null && generatedPropertyAttribute.IsPropertyGenerated) continue;
+                    // Don't map ignored properties
+                    var ignoredPropertyAttribute = propInfo.GetCustomAttribute<IgnoredPropertyAttribute>();
+                    if (ignoredPropertyAttribute != null) continue;
 
-                    var attribute = propInfo.GetCustomAttribute<LookupListNameAttribute>();
+                    var lookupListNameAttribute = propInfo.GetCustomAttribute<LookupListNameAttribute>();
 
                     if (propInfo.PropertyType.IsArray)
                     {
-                        if (attribute == null)
-                        {
-                            listItem[propInfo.PropertyName()] = propInfo.GetValue(aggregateRoot);
-                        }
-                        else
+                        if (lookupListNameAttribute != null)
                         {
                             var values = propInfo.GetValue(aggregateRoot) as SharePointDomainModel[];
 
@@ -313,14 +412,23 @@ namespace Amt.SharePoint.Integration
                                 LookupId = value.ID
                             }).ToArray();
                         }
-                    }
-                    else
-                    {
-                        if (attribute == null)
+                        else
                         {
                             listItem[propInfo.PropertyName()] = propInfo.GetValue(aggregateRoot);
                         }
-                        else
+                    }
+                    else
+                    {
+                        if (lookupListNameAttribute == null && propInfo.GetValue(aggregateRoot) != null)
+                        {
+                            // If the value is a date time and is date time min value, then SharePoint doesn't like it.
+                            if (propInfo.PropertyType != typeof(DateTime) ||
+                                (DateTime) propInfo.GetValue(aggregateRoot) != DateTime.MinValue)
+                        {
+                            listItem[propInfo.PropertyName()] = propInfo.GetValue(aggregateRoot);
+                        }
+                        }
+                        else if(propInfo.GetValue(aggregateRoot) != null)
                         {
                             var value = propInfo.GetValue(aggregateRoot) as SharePointDomainModel;
 
@@ -337,16 +445,67 @@ namespace Amt.SharePoint.Integration
             }
         }
 
+        private void DownloadImage(string url)
+        {
+            var filePath = (HttpContext.Current.Server.MapPath("~") + url).Replace("\\/", "\\").Replace("/", "\\").Replace("%20", " ");
+            var localPath = filePath.Substring(0, filePath.LastIndexOf("\\"));
+            if (!Directory.Exists(localPath))
+            {
+                Directory.CreateDirectory(localPath);
+            }
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                try
+                {
+                    FileInformation spFileInfo = Microsoft.SharePoint.Client.File.OpenBinaryDirect(_ctx, url);
+
+                    using (Stream destination = System.IO.File.Create(filePath))
+                    {
+                        for (int a = spFileInfo.Stream.ReadByte(); a != -1; a = spFileInfo.Stream.ReadByte())
+                            destination.WriteByte((byte) a);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var e = ex;
+                }
+            }
+        }
+        
         private static string TSharePointListName
         {
             get
             {
                 var attribute =
-                    Attribute.GetCustomAttribute(typeof(T), typeof(ListNameAttribute)) as ListNameAttribute;
+                    Attribute.GetCustomAttributes(typeof(T), typeof(ListNameAttribute)) as ListNameAttribute[];
+
+                if (attribute == null)
+                {
+                    return typeof(T).Name;
+                }
+                if (attribute.Length == 0)
+                {
+                    return typeof(T).Name;
+                }
+                if (attribute.Length == 1)
+                {
+                    return attribute[0].ListName;
+                }
+                return attribute.First().ListName;
+            }
+        }
+
+        private static string TSharePointSubSiteName
+        {
+            get
+            {
+                var attribute =
+                    Attribute.GetCustomAttribute(typeof(T), typeof(SubSiteNameAttribute)) as SubSiteNameAttribute;
 
                 return attribute == null
-                    ? typeof(T).Name
-                    : attribute.ListName;
+                    ? ""
+                    : attribute.SubSiteName;
             }
         }
     }
